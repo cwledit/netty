@@ -272,6 +272,10 @@ public final class PlatformDependent {
         PlatformDependent0.putByte(address, value);
     }
 
+    public static void putByte(long address, int position, byte value) {
+        PlatformDependent0.putByte(address, position, value);
+    }
+
     public static void putShort(long address, short value) {
         PlatformDependent0.putShort(address, value);
     }
@@ -573,6 +577,14 @@ public final class PlatformDependent {
                     "You don't have Javassist in your class path or you don't have enough permission " +
                     "to load dynamically generated classes.  Please check the configuration for better performance.");
             return false;
+        }
+    }
+
+    public static char[] getChars(String seq) {
+        if (hasUnsafe()) {
+            return PlatformDependent0.getChars(seq);
+        } else {
+            return seq.toCharArray();
         }
     }
 

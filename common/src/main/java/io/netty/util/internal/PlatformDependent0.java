@@ -38,6 +38,9 @@ final class PlatformDependent0 {
     private static final long CLEANER_FIELD_OFFSET;
     private static final long ADDRESS_FIELD_OFFSET;
     private static final Field CLEANER_FIELD;
+    private static final long STRING_OFFSET_FIELD_OFFSET;
+    private static final long STRING_VALUE_FIELD_OFFSET;
+
 
     /**
      * {@code true} if and only if the platform supports unaligned access.
@@ -80,62 +83,90 @@ final class PlatformDependent0 {
         logger.debug("java.nio.Buffer.address: {}", addressField != null? "available" : "unavailable");
 
         Unsafe unsafe;
-        if (addressField != null && cleanerField != null) {
+        try {
+            Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
+            unsafeField.setAccessible(true);
+            unsafe = (Unsafe) unsafeField.get(null);
+            logger.debug("sun.misc.Unsafe.theUnsafe: {}", unsafe != null? "available" : "unavailable");
+
+            // Ensure the unsafe supports all necessary methods to work around the mistake in the latest OpenJDK.
+            // https://github.com/netty/netty/issues/1061
+            // http://www.mail-archive.com/jdk6-dev@openjdk.java.net/msg00698.html
             try {
-                Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-                unsafeField.setAccessible(true);
-                unsafe = (Unsafe) unsafeField.get(null);
-                logger.debug("sun.misc.Unsafe.theUnsafe: {}", unsafe != null? "available" : "unavailable");
+                unsafe.getClass().getDeclaredMethod(
+                        "copyMemory",
+                        new Class[] { Object.class, long.class, Object.class, long.class, long.class });
 
-                // Ensure the unsafe supports all necessary methods to work around the mistake in the latest OpenJDK.
-                // https://github.com/netty/netty/issues/1061
-                // http://www.mail-archive.com/jdk6-dev@openjdk.java.net/msg00698.html
-                try {
-                    unsafe.getClass().getDeclaredMethod(
-                            "copyMemory",
-                            new Class[] { Object.class, long.class, Object.class, long.class, long.class });
-
-                    logger.debug("sun.misc.Unsafe.copyMemory: available");
-                } catch (NoSuchMethodError t) {
-                    logger.debug("sun.misc.Unsafe.copyMemory: unavailable");
-                    throw t;
-                } catch (NoSuchMethodException e) {
-                    logger.debug("sun.misc.Unsafe.copyMemory: unavailable");
-                    throw e;
-                }
-            } catch (Throwable cause) {
-                unsafe = null;
+                logger.debug("sun.misc.Unsafe.copyMemory: available");
+            } catch (NoSuchMethodError t) {
+                logger.debug("sun.misc.Unsafe.copyMemory: unavailable");
+                throw t;
+            } catch (NoSuchMethodException e) {
+                logger.debug("sun.misc.Unsafe.copyMemory: unavailable");
+                throw e;
             }
-        } else {
-            // If we cannot access the address of a direct buffer, there's no point of using unsafe.
-            // Let's just pretend unsafe is unavailable for overall simplicity.
+        } catch (Throwable cause) {
             unsafe = null;
         }
         UNSAFE = unsafe;
 
-        if (unsafe == null) {
+        if (UNSAFE == null) {
             CLEANER_FIELD_OFFSET = -1;
             ADDRESS_FIELD_OFFSET = -1;
             UNALIGNED = false;
+            STRING_OFFSET_FIELD_OFFSET = -1;
+            STRING_VALUE_FIELD_OFFSET = -1;
         } else {
-            ADDRESS_FIELD_OFFSET = objectFieldOffset(addressField);
-            CLEANER_FIELD_OFFSET = objectFieldOffset(cleanerField);
+            if (addressField == null && cleanerField == null) {
+                // If we cannot access the address of a direct buffer, there's no point of using unsafe.
+                // Let's just pretend unsafe is unavailable for overall simplicity.
+                CLEANER_FIELD_OFFSET = -1;
+                ADDRESS_FIELD_OFFSET = -1;
+                UNALIGNED = false;
+            } else {
+                ADDRESS_FIELD_OFFSET = objectFieldOffset(addressField);
+                CLEANER_FIELD_OFFSET = objectFieldOffset(cleanerField);
 
-            boolean unaligned;
-            try {
-                Class<?> bitsClass = Class.forName("java.nio.Bits", false, ClassLoader.getSystemClassLoader());
-                Method unalignedMethod = bitsClass.getDeclaredMethod("unaligned");
-                unalignedMethod.setAccessible(true);
-                unaligned = Boolean.TRUE.equals(unalignedMethod.invoke(null));
-            } catch (Throwable t) {
-                // We at least know x86 and x64 support unaligned access.
-                String arch = SystemPropertyUtil.get("os.arch", "");
-                //noinspection DynamicRegexReplaceableByCompiledPattern
-                unaligned = arch.matches("^(i[3-6]86|x86(_64)?|x64|amd64)$");
+                boolean unaligned;
+                try {
+                    Class<?> bitsClass = Class.forName("java.nio.Bits", false, ClassLoader.getSystemClassLoader());
+                    Method unalignedMethod = bitsClass.getDeclaredMethod("unaligned");
+                    unalignedMethod.setAccessible(true);
+                    unaligned = Boolean.TRUE.equals(unalignedMethod.invoke(null));
+                } catch (Throwable t) {
+                    // We at least know x86 and x64 support unaligned access.
+                    String arch = SystemPropertyUtil.get("os.arch", "");
+                    //noinspection DynamicRegexReplaceableByCompiledPattern
+                    unaligned = arch.matches("^(i[3-6]86|x86(_64)?|x64|amd64)$");
+                }
+
+                UNALIGNED = unaligned;
+                logger.debug("java.nio.Bits.unaligned: {}", UNALIGNED);
             }
-
-            UNALIGNED = unaligned;
-            logger.debug("java.nio.Bits.unaligned: {}", UNALIGNED);
+            long stringValueFieldOffset;
+            long stringOffsetFieldOffset;
+            try {
+                Field stringValueField = String.class
+                        .getDeclaredField("value");
+                stringValueFieldOffset = objectFieldOffset(stringValueField);
+                Field declaredField;
+                try {
+                    declaredField = String.class.getDeclaredField("offset");
+                } catch (NoSuchFieldException e) {
+                    // this will happen for jdk7 as these fields have been removed
+                    declaredField = null;
+                }
+                if (declaredField != null) {
+                    stringOffsetFieldOffset = unsafe.objectFieldOffset(declaredField);
+                } else {
+                    stringOffsetFieldOffset = -1L;
+                }
+            } catch (Throwable cause) {
+                stringValueFieldOffset = -1L;
+                stringOffsetFieldOffset = -1L;
+            }
+            STRING_OFFSET_FIELD_OFFSET = stringOffsetFieldOffset;
+            STRING_VALUE_FIELD_OFFSET = stringValueFieldOffset;
         }
     }
 
@@ -259,6 +290,10 @@ final class PlatformDependent0 {
         UNSAFE.putByte(address, value);
     }
 
+    static void putByte(long address, int position, byte b) {
+        UNSAFE.putByte(address + (position << 0), b);
+    }
+
     static void putShort(long address, short value) {
         if (UNALIGNED) {
             UNSAFE.putShort(address, value);
@@ -317,6 +352,17 @@ final class PlatformDependent0 {
 
     static void copyMemory(Object src, long srcOffset, Object dst, long dstOffset, long length) {
         UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, length);
+    }
+
+    static char[] getChars(String s) {
+        return (char[]) getObject(s, STRING_VALUE_FIELD_OFFSET);
+    }
+
+    static int getOffset(String s) {
+        if (STRING_VALUE_FIELD_OFFSET == -1L)
+            return 0;
+        else
+            return getInt(s, STRING_OFFSET_FIELD_OFFSET);
     }
 
     private PlatformDependent0() {
