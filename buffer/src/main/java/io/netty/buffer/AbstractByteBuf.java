@@ -1189,7 +1189,6 @@ public abstract class AbstractByteBuf extends ByteBuf {
     private int setCharSequence0(int index, CharSequence seq, Charset charset) {
         // check if we can write the seq in an optimized way
         if (charset.equals(CharsetUtil.US_ASCII)) {
-            System.out.println("HERE");
             int length = seq.length();
             checkIndex(index, length);
 
@@ -1198,12 +1197,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
             }
             return length;
         }
-        byte[] bytes;
-        if (seq instanceof String) {
-            bytes = ((String) seq).getBytes(charset);
-        } else {
-            bytes = seq.toString().getBytes(charset);
-        }
+        byte[] bytes = seq.toString().getBytes(charset);
         setBytes(index, bytes);
         return bytes.length;
     }
