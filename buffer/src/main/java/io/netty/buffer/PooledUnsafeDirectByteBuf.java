@@ -16,6 +16,7 @@
 
 package io.netty.buffer;
 
+import io.netty.util.CharsetUtil;
 import io.netty.util.Recycler;
 import io.netty.util.internal.PlatformDependent;
 
@@ -27,6 +28,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
+import java.nio.charset.Charset;
 
 final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
 
@@ -381,5 +383,35 @@ final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
     @Override
     protected Recycler<?> recycler() {
         return RECYCLER;
+    }
+
+    @Override
+    public ByteBuf writeCharSequence(CharSequence seq, Charset charset) {
+        if (charset.equals(CharsetUtil.US_ASCII) && seq instanceof String) {
+            char[] chars = PlatformDependent.getChars((String) seq);
+            int wIndex = writerIndex();
+            checkIndex(wIndex, chars.length);
+
+            for (int i = 0; i < chars.length; i++) {
+                _setByte(wIndex + i, (byte) chars[i]);
+            }
+            writerIndex(wIndex + chars.length);
+            return this;
+        }
+        return super.writeCharSequence(seq, charset);
+    }
+
+    @Override
+    public ByteBuf setCharSequence(int index, CharSequence seq, Charset charset) {
+        if (charset.equals(CharsetUtil.US_ASCII) && seq instanceof String) {
+            char[] chars = PlatformDependent.getChars((String) seq);
+            checkIndex(index, chars.length);
+
+            for (int i = 0; i < chars.length; i++) {
+                _setByte(index + i, (byte) chars[i]);
+            }
+            return this;
+        }
+        return super.setCharSequence(index, seq, charset);
     }
 }

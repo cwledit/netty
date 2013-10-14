@@ -15,6 +15,7 @@
  */
 package io.netty.buffer;
 
+import io.netty.util.CharsetUtil;
 import io.netty.util.IllegalReferenceCountException;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.internal.PlatformDependent;
@@ -1171,5 +1172,39 @@ public abstract class AbstractByteBuf extends ByteBuf {
         if (refCnt() == 0) {
             throw new IllegalReferenceCountException(0);
         }
+    }
+
+    @Override
+    public ByteBuf writeCharSequence(CharSequence seq, Charset charset) {
+        writerIndex +=  setCharSequence0(writerIndex, seq, charset);
+        return this;
+    }
+
+    @Override
+    public ByteBuf setCharSequence(int index, CharSequence seq, Charset charset) {
+        setCharSequence0(index, seq, charset);
+        return this;
+    }
+
+    private int setCharSequence0(int index, CharSequence seq, Charset charset) {
+        // check if we can write the seq in an optimized way
+        if (charset.equals(CharsetUtil.US_ASCII)) {
+            System.out.println("HERE");
+            int length = seq.length();
+            checkIndex(index, length);
+
+            for (int i = 0; i < length; i++) {
+                _setByte(index + i, (byte) seq.charAt(i));
+            }
+            return length;
+        }
+        byte[] bytes;
+        if (seq instanceof String) {
+            bytes = ((String) seq).getBytes(charset);
+        } else {
+            bytes = seq.toString().getBytes(charset);
+        }
+        setBytes(index, bytes);
+        return bytes.length;
     }
 }

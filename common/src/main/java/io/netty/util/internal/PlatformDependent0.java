@@ -41,7 +41,6 @@ final class PlatformDependent0 {
     private static final long STRING_OFFSET_FIELD_OFFSET;
     private static final long STRING_VALUE_FIELD_OFFSET;
 
-
     /**
      * {@code true} if and only if the platform supports unaligned access.
      *
@@ -359,10 +358,11 @@ final class PlatformDependent0 {
     }
 
     static int getOffset(String s) {
-        if (STRING_VALUE_FIELD_OFFSET == -1L)
+        if (STRING_VALUE_FIELD_OFFSET == -1L) {
             return 0;
-        else
+        } else {
             return getInt(s, STRING_OFFSET_FIELD_OFFSET);
+        }
     }
 
     private PlatformDependent0() {

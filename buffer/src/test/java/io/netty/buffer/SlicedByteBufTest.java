@@ -88,4 +88,16 @@ public class SlicedByteBufTest extends AbstractByteBufTest {
     public void testSliceBytesInArrayMultipleThreads() throws Exception {
         super.testSliceBytesInArrayMultipleThreads();
     }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    @Override
+    public void testWriteCharsequenceUS_ASCII() {
+        super.testWriteCharsequenceUS_ASCII();
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    @Override
+    public void testWriteCharsequenceUTF_8() {
+        super.testWriteCharsequenceUTF_8();
+    }
 }
