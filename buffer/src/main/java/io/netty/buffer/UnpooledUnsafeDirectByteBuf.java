@@ -510,14 +510,8 @@ public class UnpooledUnsafeDirectByteBuf extends AbstractReferenceCountedByteBuf
     @Override
     public ByteBuf writeCharSequence(CharSequence seq, Charset charset) {
         if (charset.equals(CharsetUtil.US_ASCII) && seq instanceof String) {
-            char[] chars = PlatformDependent.getChars((String) seq);
-            int wIndex = writerIndex();
-            checkIndex(wIndex, chars.length);
-
-            for (int i = 0; i < chars.length; i++) {
-                _setByte(wIndex + i, (byte) chars[i]);
-            }
-            writerIndex(wIndex + chars.length);
+            int writerIndex = writerIndex();
+            writerIndex(writerIndex + setStringUsAscii(writerIndex, seq.toString()));
             return this;
         }
         return super.writeCharSequence(seq, charset);
@@ -526,14 +520,20 @@ public class UnpooledUnsafeDirectByteBuf extends AbstractReferenceCountedByteBuf
     @Override
     public ByteBuf setCharSequence(int index, CharSequence seq, Charset charset) {
         if (charset.equals(CharsetUtil.US_ASCII) && seq instanceof String) {
-            char[] chars = PlatformDependent.getChars((String) seq);
-            checkIndex(index, chars.length);
-
-            for (int i = 0; i < chars.length; i++) {
-                _setByte(index + i, (byte) chars[i]);
-            }
+            setStringUsAscii(index, seq.toString());
             return this;
         }
         return super.setCharSequence(index, seq, charset);
+    }
+
+    private int setStringUsAscii(int index, String str) {
+        int length = str.length();
+        char[] chars = PlatformDependent.getChars(str);
+        checkIndex(index, length);
+
+        for (int i = 0; i < length; i++) {
+            _setByte(index + i, (byte) chars[i]);
+        }
+        return length;
     }
 }
