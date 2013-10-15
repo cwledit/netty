@@ -1957,7 +1957,7 @@ public abstract class AbstractByteBufTest {
     private void testWriteCharsequence0(Charset charset) {
         String text = "This is a test";
         byte[] data = text.getBytes(charset);
-        final ByteBuf buffer = freeLater(newBuffer(16));
+        final ByteBuf buffer = freeLater(newBuffer(64));
         buffer.writeCharSequence(text, charset);
         assertEquals(data.length, buffer.readableBytes());
         byte[] bytes = new byte[data.length];

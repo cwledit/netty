@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.CharBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
@@ -1197,8 +1198,12 @@ public abstract class AbstractByteBuf extends ByteBuf {
             }
             return length;
         }
-        byte[] bytes = seq.toString().getBytes(charset);
-        setBytes(index, bytes);
-        return bytes.length;
+        if (nioBufferCount() == 1) {
+            return ByteBufUtil.encodeCharBuffer(this, index, CharBuffer.wrap(seq), charset);
+        } else {
+            byte[] bytes = seq.toString().getBytes(CharsetUtil.UTF_8);
+            setBytes(index, bytes);
+            return bytes.length;
+        }
     }
 }
